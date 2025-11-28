@@ -1,19 +1,23 @@
+import math
 import re
 import requests
 from bs4 import BeautifulSoup
-from model import Product
-
+from database.models import Product
+from  decouple import config
 class MetroParser:
-
+    __HEADERS = {
+        "User-Agent": config("METRO_USER_AGENT"),
+        "Accept": config("METRO_ACCEPT"),
+        "Accept-Language":config("METRO_ACCEPT_LANGUAGE"),
+    }
 
     def __init__(self,url:str):
         self.__base_url = url
 
-
     def parse(self,pages:int = None):
         list_of_products = []
         total_pages = self.__calculate_total_pages()
-        print(total_pages)
+        # print(total_pages)
         page = 1
 
         if pages and 0<pages<total_pages:
@@ -25,7 +29,8 @@ class MetroParser:
 
     def __parse_single_page(self,page_num:int):
         list_of_products = []
-        request = requests.get(f"{self.__base_url}?page={page_num}")
+        request = requests.get(f"{self.__base_url}?page={page_num}",
+        headers=self.__HEADERS,timeout=10)
         soup = BeautifulSoup(request.text, 'lxml')
         products = soup.find_all("div", class_="product-card")
 
@@ -44,12 +49,13 @@ class MetroParser:
 
 
     def __calculate_total_pages(self):
-        request = requests.get(self.__base_url)
+        request = requests.get(self.__base_url,headers= self.__HEADERS,timeout=10)
         soup = BeautifulSoup(request.text, "lxml")
         total = soup.find('span', class_="heading-products-count subcategory-or-type__heading-count")
+        print(total)
         if total:
-            total = int(total.get_text().split()[0]) # результат будет строка "N товара". Поэтому делим её и берём 1-й элемент, то есть число
-            return total//30 +1 if total%30!=0 else total//30
+            total = int(total.get_text(strip=True).split()[0]) # результат будет строка "N товара". Поэтому делим её и берём 1-й элемент, то есть число
+            return math.ceil(total / 30)
         else:
             return 1 #Если не нашлось, то ищем на 1 странице
 
